@@ -1,0 +1,64 @@
+import streamlit as st
+import psycopg2
+import pandas as pd
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+def get_connection():
+    return psycopg2.connect(
+        dbname=os.getenv('DB_NAME'),
+        user=os.getenv('DB_USER'),
+        password=os.getenv('DB_PASSWORD'),
+        host=os.getenv('DB_HOST'),
+        port=os.getenv('DB_PORT')
+    )
+
+def fetch_data_from_db(query):
+    connection = get_connection()
+    df = pd.read_sql_query(query, connection)
+    connection.close()
+    return df
+
+st.title("Air Quality Dashboard")
+
+cities = ["Beijing", "Delhi", "New York", "London", "Tokyo",
+          "Los Angeles", "Paris", "Berlin", "Moscow", "Sydney",
+          "Mexico City", "Rio de Janeiro", "Cairo", "Mumbai",
+          "Bangkok", "Jakarta", "Seoul", "Hong Kong", "Dubai",
+          "Singapore", "Nairobi", "Cape Town", "Lagos", "Accra",
+          "Addis Ababa", "Johannesburg", "Casablanca", "Dakar",
+          "Abidjan", "Dar es Salaam"]
+
+city = st.selectbox("Select a city", cities)
+
+if st.button("Show Current Air Quality"):
+    query = f"SELECT * FROM air_quality WHERE city = '{city}' ORDER BY timestamp DESC LIMIT 1"
+    current_data = fetch_data_from_db(query)
+    st.write(current_data)
+
+if st.button("Show Historical Air Quality"):
+    query = f"SELECT * FROM air_quality WHERE city = '{city}' ORDER BY timestamp DESC"
+    historical_data = fetch_data_from_db(query)
+    st.line_chart(historical_data.set_index('timestamp')['aqi'])
+
+st.subheader("Compare Air Quality Between Cities")
+city1 = st.selectbox("Select first city", cities, key='city1')
+city2 = st.selectbox("Select second city", cities, key='city2')
+
+if st.button("Compare"):
+    query1 = f"SELECT * FROM air_quality WHERE city = '{city1}' ORDER BY timestamp DESC LIMIT 1"
+    query2 = f"SELECT * FROM air_quality WHERE city = '{city2}' ORDER BY timestamp DESC LIMIT 1"
+    data1 = fetch_data_from_db(query1)
+    data2 = fetch_data_from_db(query2)
+    
+    st.write(f"Current air quality in {city1}:")
+    st.write(data1)
+    
+    st.write(f"Current air quality in {city2}:")
+    st.write(data2)
+
+    comparison_data = pd.concat([data1.set_index('timestamp')['aqi'], data2.set_index('timestamp')['aqi']], axis=1)
+    comparison_data.columns = [city1, city2]
+    st.line_chart(comparison_data)
